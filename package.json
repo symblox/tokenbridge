@@ -52,6 +52,6 @@
     "postinstall": "test -n \"$NOYARNPOSTINSTALL\" || ln -sf $(pwd)/node_modules/openzeppelin-solidity/ contracts/node_modules/openzeppelin-solidity"
   },
   "engines": {
-    "node": "10.x"
+    "node": "12.x"
   }
 }
