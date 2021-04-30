@@ -42,6 +42,13 @@ ORACLE_HOME_TO_FOREIGN_BLOCK_LIST | Filename with a list of addresses, separated
 ORACLE_HOME_TO_FOREIGN_CHECK_SENDER | If set to `true`, instructs the oracle to do an extra check for transaction origin in the block/allowance list. `false` by default. | `true` / `false`
 ORACLE_ALWAYS_RELAY_SIGNATURES | If set to `true`, the oracle will always relay signatures even if it was not the last who finilized the signatures collecting process. The default is `false`. | `true` / `false`
 ORACLE_RPC_REQUEST_TIMEOUT | Timeout in milliseconds for a single RPC request. Default value is `ORACLE_*_RPC_POLLING_INTERVAL * 2`. | integer
+ORACLE_HOME_TX_RESEND_INTERVAL | Interval in milliseconds for automatic resending of stuck transactions for Home sender service. Defaults to 20 minutes. | integer  
+ORACLE_FOREIGN_TX_RESEND_INTERVAL | Interval in milliseconds for automatic resending of stuck transactions for Foreign sender service. Defaults to 20 minutes. | integer  
+ORACLE_SHUTDOWN_SERVICE_URL | Optional external URL to some other service/monitor/configuration manager that controls the remote shutdown process. GET request should return `application/json` message with the following schema: `{ shutdown: true/false }`. | URL
+ORACLE_SHUTDOWN_SERVICE_POLLING_INTERVAL | Optional interval in milliseconds used to request the side RPC node or external shutdown service. Default is 120000. | integer
+ORACLE_SIDE_RPC_URL | Optional HTTPS URL(s) for communication with the external shutdown service or side RPC nodes, used for shutdown manager activities. Several URLs can be specified, delimited by spaces. If the connection to one of these nodes is lost the next URL is used for connection. | URL(s)
+ORACLE_SHUTDOWN_CONTRACT_ADDRESS | Optional contract address in the side chain accessible through `ORACLE_SIDE_RPC_URL`, where the method passed in `ORACLE_SHUTDOWN_CONTRACT_METHOD` is implemented. | `address`
+ORACLE_SHUTDOWN_CONTRACT_METHOD | Method signature to be used in the side chain to identify the current shutdown status. Method should return boolean. Default value is `isShutdown()`. | `function signature`
 
 
 ## UI configuration
@@ -82,3 +89,5 @@ MONITOR_CACHE_EVENTS | If set to true, monitor will cache obtained events for ot
 MONITOR_HOME_TO_FOREIGN_ALLOWANCE_LIST | File with a list of addresses, separated by newlines. If set, determines the privileged set of accounts whose requests should be automatically processed by the CollectedSignatures watcher. | string
 MONITOR_HOME_TO_FOREIGN_BLOCK_LIST | File with a list of addresses, separated by newlines. If set, determines the set of accounts whose requests should be marked as unclaimed. Has a lower priority than the `MONITOR_HOME_TO_FOREIGN_ALLOWANCE_LIST`. | string
 MONITOR_HOME_TO_FOREIGN_CHECK_SENDER | If set to `true`, instructs the oracle to do an extra check for transaction origin in the block/allowance list. `false` by default. | `true` / `false`
+MONITOR_HOME_VALIDATORS_BALANCE_ENABLE | If set, defines the list of home validator addresses for which balance should be checked. | `string`
+MONITOR_FOREIGN_VALIDATORS_BALANCE_ENABLE | If set, defines the list of foreign validator addresses for which balance should be checked. | `string`

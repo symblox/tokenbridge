@@ -39,21 +39,38 @@ export interface ConfirmationsContainerParams {
   message: MessageObject
   receipt: Maybe<TransactionReceipt>
   fromHome: boolean
-  timestamp: number
+  homeStartBlock: Maybe<number>
+  foreignStartBlock: Maybe<number>
 }
 
-export const ConfirmationsContainer = ({ message, receipt, fromHome, timestamp }: ConfirmationsContainerParams) => {
+export const ConfirmationsContainer = ({
+  message,
+  receipt,
+  fromHome,
+  homeStartBlock,
+  foreignStartBlock
+}: ConfirmationsContainerParams) => {
   const {
     home: { name: homeName },
     foreign: { name: foreignName }
   } = useStateProvider()
   const { requiredSignatures, validatorList } = useValidatorContract({ fromHome, receipt })
   const { blockConfirmations } = useBlockConfirmations({ fromHome, receipt })
-  const { confirmations, status, executionData, signatureCollected, waitingBlocksResolved } = useMessageConfirmations({
+  const {
+    confirmations,
+    status,
+    executionData,
+    signatureCollected,
+    waitingBlocksResolved,
+    setExecutionData,
+    executionEventsFetched,
+    setPendingExecution
+  } = useMessageConfirmations({
     message,
     receipt,
     fromHome,
-    timestamp,
+    homeStartBlock,
+    foreignStartBlock,
     requiredSignatures,
     validatorList,
     blockConfirmations
@@ -102,7 +119,17 @@ export const ConfirmationsContainer = ({ message, receipt, fromHome, timestamp }
           validatorList={validatorList}
           waitingBlocksResolved={waitingBlocksResolved}
         />
-        {signatureCollected && <ExecutionConfirmation executionData={executionData} isHome={!fromHome} />}
+        {signatureCollected && (
+          <ExecutionConfirmation
+            messageData={message.data}
+            executionData={executionData}
+            isHome={!fromHome}
+            signatureCollected={signatureCollected}
+            setExecutionData={setExecutionData}
+            executionEventsFetched={executionEventsFetched}
+            setPendingExecution={setPendingExecution}
+          />
+        )}
       </StyledConfirmationContainer>
     </div>
   )

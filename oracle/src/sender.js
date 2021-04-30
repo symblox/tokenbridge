@@ -4,6 +4,7 @@ const { connectSenderToQueue } = require('./services/amqpClient')
 const { redis } = require('./services/redisClient')
 const GasPrice = require('./services/gasPrice')
 const logger = require('./services/logger')
+const { getShutdownFlag } = require('./services/shutdownState')
 const { sendTx } = require('./tx/sendTx')
 const { getNonce, getChainId } = require('./tx/web3')
 const {
@@ -30,6 +31,8 @@ const config = require(path.join('../config/', process.argv[2]))
 
 const web3Instance = config.web3
 const web3Redundant = ORACLE_TX_REDUNDANCY === 'true' ? config.web3Redundant : config.web3
+const { web3Fallback } = config
+
 const nonceKey = `${config.id}:nonce`
 let chainId = 0
 
@@ -45,6 +48,7 @@ async function initialize() {
     connectSenderToQueue({
       queueName: config.queue,
       oldQueueName: config.oldQueue,
+      resendInterval: config.resendInterval,
       cb: options => {
         if (config.maxProcessingTime) {
           return watchdog(() => main(options), config.maxProcessingTime, () => {
@@ -99,6 +103,14 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
       return
     }
 
+    const wasShutdown = await getShutdownFlag(logger, config.shutdownKey, false)
+    if (await getShutdownFlag(logger, config.shutdownKey, true)) {
+      if (!wasShutdown) {
+        logger.info('Oracle sender was suspended via the remote shutdown process')
+      }
+      return
+    }
+
     const txArray = JSON.parse(msg.content)
     logger.debug(`Msg received with ${txArray.length} Tx to send`)
     const gasPrice = GasPrice.getPrice().toString(10)
@@ -128,7 +140,7 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
 
       try {
         if (isResend) {
-          const tx = await web3Instance.eth.getTransaction(job.txHash)
+          const tx = await web3Fallback.eth.getTransaction(job.txHash)
 
           if (tx && tx.blockNumber !== null) {
             logger.debug(`Transaction ${job.txHash} was successfully mined`)
@@ -171,15 +183,18 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
           `Tx Failed for event Tx ${job.transactionReference}.`,
           e.message
         )
-        if (!e.message.toLowerCase().includes('transaction with the same hash was already imported')) {
-          if (isResend) {
-            resendJobs.push(job)
-          } else {
-            failedTx.push(job)
-          }
+
+        const message = e.message.toLowerCase()
+        if (isResend || message.includes('transaction with the same hash was already imported')) {
+          resendJobs.push(job)
+        } else {
+          // if initial transaction sending has failed not due to the same hash error
+          // send it to the failed tx queue
+          // this will result in the sooner resend attempt than if using resendJobs
+          failedTx.push(job)
         }
 
-        if (e.message.toLowerCase().includes('insufficient funds')) {
+        if (message.includes('insufficient funds')) {
           insufficientFunds = true
           const currentBalance = await web3Instance.eth.getBalance(ORACLE_VALIDATOR_ADDRESS)
           minimumBalance = gasLimit.multipliedBy(gasPrice)
@@ -202,7 +217,7 @@ async function main({ msg, ackMsg, nackMsg, channel, scheduleForRetry, scheduleT
       await scheduleForRetry(failedTx, msg.properties.headers['x-retries'])
     }
     if (resendJobs.length) {
-      logger.info(`Sending ${resendJobs.length} Tx Delayed Resend Requests to Queue`)
+      logger.info({ delay: config.resendInterval }, `Sending ${resendJobs.length} Tx Delayed Resend Requests to Queue`)
       await scheduleTransactionResend(resendJobs)
     }
     ackMsg(msg)
